@@ -249,11 +249,12 @@ async function fetchPrices(){
     const xauusd = +usd.price;
     const xaucny = +cny.price;
     const au9999 = xaucny / GRAM_PER_OZ;
-    // 以本会话首次加载的真实价格作为基准（不使用随机值）
-    const sessKey = 'gold_baseline';
-    let baseline = JSON.parse(sessionStorage.getItem(sessKey) || '{}');
+    // 以当日首次获取的真实价格作为基准（localStorage 按日期存储，跨刷新持久化）
+    const today = new Date().toISOString().slice(0,10);
+    const key = 'gold_baseline_'+today;
+    let baseline = JSON.parse(localStorage.getItem(key) || '{}');
     if(!baseline.AU9999){ baseline.AU9999 = au9999; baseline.XAUUSD = xauusd;
-      sessionStorage.setItem(sessKey, JSON.stringify(baseline)); }
+      localStorage.setItem(key, JSON.stringify(baseline)); }
     state.prices = {
       AU9999:{price:au9999, prev:baseline.AU9999, unit:'元/克'},
       XAUUSD:{price:xauusd, prev:baseline.XAUUSD, unit:'美元/盎司'}
@@ -280,8 +281,8 @@ function renderHome(){
     </div>`;
   };
   document.getElementById('priceGrid').innerHTML =
-    card('AU9999','AU9999 现货黄金','au','上海金 · 较本会话') +
-    card('XAUUSD','伦敦现货黄金 XAUUSD','ln','国际金 · 较本会话');
+    card('AU9999','AU9999 现货黄金','au','上海金 · 较今日') +
+    card('XAUUSD','伦敦现货黄金 XAUUSD','ln','国际金 · 较今日');
 }
 
 /* ================= 详情 & 图表 ================= */
@@ -401,7 +402,7 @@ if('serviceWorker' in navigator){
 /* ================= 启动 ================= */
 renderProducts();
 fetchPrices();
-setInterval(fetchPrices, 30000);
+setInterval(fetchPrices, 10000);
 </script>
 </body>
 </html>
