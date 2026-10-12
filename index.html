@@ -249,12 +249,23 @@ async function fetchPrices(){
     const xauusd = +usd.price;
     const xaucny = +cny.price;
     const au9999 = xaucny / GRAM_PER_OZ;
-    // 以当日首次获取的真实价格作为基准（localStorage 按日期存储，跨刷新持久化）
+    // 当日基准价：优先取当日首次价格；若无则取最近一次已知价格（近似昨收）
     const today = new Date().toISOString().slice(0,10);
-    const key = 'gold_baseline_'+today;
-    let baseline = JSON.parse(localStorage.getItem(key) || '{}');
-    if(!baseline.AU9999){ baseline.AU9999 = au9999; baseline.XAUUSD = xauusd;
-      localStorage.setItem(key, JSON.stringify(baseline)); }
+    const dayKey = 'gold_baseline_'+today;
+    const lastKey = 'gold_last_price';
+    let baseline = JSON.parse(localStorage.getItem(dayKey) || '{}');
+    if(!baseline.AU9999){
+      // 今日尚无基准，尝试用昨日最后一次价格作为近似昨收
+      const last = JSON.parse(localStorage.getItem(lastKey) || '{}');
+      if(last.AU9999 && last.date && last.date !== today){
+        baseline = {AU9999:last.AU9999, XAUUSD:last.XAUUSD, fromPrev:true};
+      }else{
+        baseline = {AU9999:au9999, XAUUSD:xauusd};
+      }
+      localStorage.setItem(dayKey, JSON.stringify(baseline));
+    }
+    // 记录最近一次价格（用于下次打开时估算昨收）
+    localStorage.setItem(lastKey, JSON.stringify({AU9999:au9999, XAUUSD:xauusd, date:today}));
     state.prices = {
       AU9999:{price:au9999, prev:baseline.AU9999, unit:'元/克'},
       XAUUSD:{price:xauusd, prev:baseline.XAUUSD, unit:'美元/盎司'}

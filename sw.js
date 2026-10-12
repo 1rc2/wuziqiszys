@@ -1,4 +1,4 @@
-const CACHE_NAME = 'gold-monitor-v1';
+const CACHE_NAME = 'gold-monitor-v2';
 const CACHE_URLS = [
   './',
   './index.html',
@@ -28,21 +28,36 @@ self.addEventListener('activate', e => {
   self.clients.claim();
 });
 
-// 请求拦截：缓存优先，网络回退
+// 请求拦截：HTML 网络优先（确保更新及时），静态资源缓存优先
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
   // 外部 API 请求不缓存（实时行情）
   if (url.origin !== location.origin) return;
-  e.respondWith(
-    caches.match(e.request).then(cached => {
-      const fetchPromise = fetch(e.request).then(resp => {
-        if (resp && resp.status === 200) {
+  const isHTML = e.request.mode === 'navigate' || url.pathname.endsWith('.html') || url.pathname === '/';
+  if(isHTML){
+    // 网络优先，失败回退缓存
+    e.respondWith(
+      fetch(e.request).then(resp => {
+        if(resp && resp.status === 200){
           const respClone = resp.clone();
           caches.open(CACHE_NAME).then(cache => cache.put(e.request, respClone));
         }
         return resp;
-      }).catch(() => cached);
-      return cached || fetchPromise;
-    })
-  );
+      }).catch(() => caches.match(e.request))
+    );
+  }else{
+    // 静态资源：缓存优先，后台更新
+    e.respondWith(
+      caches.match(e.request).then(cached => {
+        const fetchPromise = fetch(e.request).then(resp => {
+          if(resp && resp.status === 200){
+            const respClone = resp.clone();
+            caches.open(CACHE_NAME).then(cache => cache.put(e.request, respClone));
+          }
+          return resp;
+        }).catch(() => cached);
+        return cached || fetchPromise;
+      })
+    );
+  }
 });
